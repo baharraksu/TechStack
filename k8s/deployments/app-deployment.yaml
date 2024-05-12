@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tech-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tech-app
+  template:
+    metadata:
+      labels:
+        app: tech-app
+    spec:
+      containers:
+        - name: tech-app
+          image: tech-app:v2
+          ports:
+            - containerPort: 3000  

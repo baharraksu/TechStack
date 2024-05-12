@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Deployment
+metadata:
+  name: redis
+  labels:
+    app: redis
+spec:
+  containers:
+  - name: redis
+    image: redis:latest
+    ports:
+    - containerPort: 6379
+    resources:
+      requests:
+        memory: "64Mi"  # İsteğe bağlı: Bellek talebi
+        cpu: "100m"     # İsteğe bağlı: CPU talebi
+      limits:
+        memory: "128Mi" # İsteğe bağlı: Maksimum bellek sınırı
+        cpu: "500m"     # İsteğe bağlı: Maksimum CPU sınırı
