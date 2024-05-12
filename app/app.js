@@ -107,7 +107,89 @@ const connection = mysql.createPool({
               }
           }
       });
-  });  
+  });
+  
+  // Ürünleri listeleme endpoint'i
+  app.get('/products', (req, res) => {
+    // MySQL sorgusu
+    const query = `SELECT product_id, product_name FROM product`;
+    connection.query(query, (err, results) => {
+      if (err) {
+        console.error('MySQL Error:', err);
+        res.status(500).json({ error: 'Sunucu hatası' });
+        return;
+      }
+  
+      res.status(200).json(results);
+    });
+  });
+
+  app.post('/order', (req, res) => {
+    const { username, product_id, quantity } = req.body;
+
+    // Kullanıcı bilgisini al
+    const getUserQuery = `SELECT id FROM users WHERE username = ?`;
+    connection.query(getUserQuery, [username], (err, userResults) => {
+        if (err) {
+            console.error('MySQL Error:', err);
+            res.status(500).json({ error: 'Kullanıcı bilgisi alınamadı' });
+            return;
+        }
+
+        if (userResults.length === 0) {
+            res.status(404).json({ error: 'Kullanıcı bulunamadı' });
+            return;
+        }
+
+        const userId = userResults[0].id;
+
+        // Ürün bilgisini al
+        const getProductQuery = `SELECT product_id, stock FROM product_detail WHERE product_id = ?`;
+        connection.query(getProductQuery, [product_id], (err, productResults) => {
+            if (err) {
+                console.error('MySQL Error:', err);
+                res.status(500).json({ error: 'Ürün bilgisi alınamadı' });
+                return;
+            }
+
+            if (productResults.length === 0) {
+                res.status(404).json({ error: 'Ürün bulunamadı' });
+                return;
+            }
+
+            const stock = productResults[0].stock;
+
+            // Sipariş miktarı stoktan fazla ise hata dön
+            if (quantity > stock) {
+                res.status(400).json({ error: 'Stokta yeterli ürün bulunmamaktadır' });
+                return;
+            }
+
+            // Sipariş oluşturma ve stok düşme işlemi
+            const createOrderQuery = `INSERT INTO \`order\` (user_id, product_id, quantity) VALUES (?, ?, ?)`;
+            connection.query(createOrderQuery, [userId, product_id, quantity], (err, orderResults) => {
+                if (err) {
+                    console.error('MySQL Error:', err);
+                    res.status(500).json({ error: 'Sipariş oluşturulurken bir hata oluştu' });
+                    return;
+                }
+
+                const updateStockQuery = `UPDATE product_detail SET stock = stock - ? WHERE product_id = ?`;
+                connection.query(updateStockQuery, [quantity, product_id], (err, updateResults) => {
+                    if (err) {
+                        console.error('MySQL Error:', err);
+                        res.status(500).json({ error: 'Stok güncellenirken bir hata oluştu' });
+                        return;
+                    }
+
+                    res.status(201).json({ message: 'Sipariş oluşturuldu ve stok düşüldü' });
+                });
+            });
+        });
+    });
+});
+
+ 
   app.get("/logout",(req,res)=>{
       req.session.destroy((err)=>{
           if(err)
