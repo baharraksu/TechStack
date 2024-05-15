@@ -8,8 +8,8 @@ const mysql = require('mysql2');
 const bodyParser = require('body-parser');
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
-
-
+// const mongoose = require('mongoose');
+app.set('trust proxy', 1);
 
 const redis = require("redis");
 const RedisStore = require("connect-redis").default;
@@ -30,16 +30,16 @@ redisClient.on('error', function (err) {
     console.error('Redis connection error:', err);
 });
 
-const connectToDataBase = () => {
-    mongoose.connect("mongodb://localhost:27017")
-    .then(() => {
-        console.log("Connected To DB Sucessfully....")
-    })
-    .catch((err) => {
-        console.log(err)
-    })
-}
-module.exports = connectToDataBase
+// const connectToDataBase = () => {
+//     mongoose.connect("mongodb://localhost:27017")
+//     .then(() => {
+//         console.log("Connected To DB Sucessfully....")
+//     })
+//     .catch((err) => {
+//         console.log(err)
+//     })
+// }
+//module.exports = connectToDataBase
 const connection = mysql.createPool({
     connectionLimit: 100,
     host: "db", // MySQL servisinin adı (Docker Compose'da belirttiğiniz)
@@ -65,7 +65,6 @@ const connection = mysql.createPool({
             maxAge: 1000 * 60 * 10 
         }
     }));
-     
     app.post('/register', (req, res) => {
         const { username, password } = req.body; // POST isteği ile gelen veriyi al
     
@@ -76,20 +75,10 @@ const connection = mysql.createPool({
                 res.status(500).json({ error: 'Kayıt sırasında bir hata oluştu' });
                 return;
             }
-    
-            // Kullanıcı başarıyla kaydedildi, Redis'e de kaydedelim
-            redisClient.set(username, password, (err, reply) => {
-                if (err) {
-                    console.error('Redis hatası:', err);
-                    res.status(500).json({ error: 'Redis\'e kaydedilirken bir hata oluştu' });
-                    return;
-                }
                 res.status(200).json({ message: 'Kayıt başarıyla tamamlandı' });
             });
         });
-    });
     
-
 
   app.post("/login", (req, res) => {
       const { username, password } = req.body; // İstekten kullanıcı adı ve parola alınıyor
@@ -108,6 +97,7 @@ const connection = mysql.createPool({
           }
       });
   });
+  
   
   // Ürünleri listeleme endpoint'i
   app.get('/products', (req, res) => {
@@ -189,7 +179,86 @@ const connection = mysql.createPool({
     });
 });
 
- 
+
+const mongoose = require('mongoose'); 
+const router = express.Router();
+const { MongoClient } = require('mongodb');
+
+const username = encodeURIComponent("bahar");
+const password = encodeURIComponent("123456");
+const url = `mongodb://${username}:${password}@mongodb:27017`;
+let client;
+let db;
+async function connect() {
+    let client;
+    
+    try {
+        client = new MongoClient(url);
+        await client.connect();
+        console.log('MongoDB\'ye bağlandı');
+
+        const db = client.db('commentDB'); // Bağlantı başarılıysa veritabanına erişim
+        return db;
+    } catch (error) {
+        console.error('MongoDB\'ye bağlanırken hata oluştu:', error);
+        if (error.message.includes('Authentication failed.')) {
+            console.error('Kullanıcı adı ve şifrenizi kontrol edin');
+        }
+        process.exit(1);
+    }
+}
+client = connect();
+
+
+// Yorum Şeması ve Modeli
+const ReviewSchema = new mongoose.Schema({
+    order_id: {
+      type: String,
+      required: true
+    },
+    user_id: {
+      type: String,
+      required: true
+    },
+    content: {
+      type: String,
+      required: true
+    },
+    rating: {
+      type: Number,
+      required: true
+    }
+  });
+  
+  const Comment = mongoose.model('Comment', ReviewSchema);
+  
+  // Middleware - JSON verilerini işleme
+  app.use(express.json());
+  
+  app.post('/review', async (req, res) => {
+    const { order_id, user_id, content, rating } = req.body;
+  
+    try {
+      const comment = new Comment({ order_id, user_id, content, rating });
+      await comment.save();
+      res.status(201).send('Yorum başarıyla eklendi');
+    } catch (err) {
+      console.error('Yorum ekleme hatası:', err);
+      res.status(500).send('Yorum eklenirken bir hata oluştu');
+    }
+  });
+  
+  // Tüm yorumları getiren endpoint
+  app.get('/comments', async (req, res) => {
+    try {
+      const comments = await Comment.find();
+      res.json(comments);
+    } catch (err) {
+      console.error('Yorumlar getirme hatası:', err);
+      res.status(500).send('Yorumlar getirilirken bir hata oluştu');
+    }
+  });
+
   app.get("/logout",(req,res)=>{
       req.session.destroy((err)=>{
           if(err)
@@ -200,6 +269,7 @@ const connection = mysql.createPool({
           res.send("logout successful");
       });
   });
+
  // Oturum işlemleri tamamlandığında Redis istemcisini kapat
  process.on('SIGINT', function() {
     redisClient.quit(function () {

@@ -10,6 +10,9 @@ services:
       - "3000:3000"
     networks:
       - my_network
+    depends_on:
+      - mongodb  # MongoDB servisine bağlılık eklenmiş
+
   db:
     image: mysql:8.1.0
     container_name: mysql_db
@@ -23,6 +26,7 @@ services:
       - db_data:/var/lib/mysql
     networks:
       - my_network
+
   redis:
     container_name: redis_container
     image: redis
@@ -31,20 +35,24 @@ services:
       - "6379:6379"
     networks:
       - my_network
+
   mongodb:
     image: mongo:latest
+    container_name: my_mongodb
     ports:
       - "27017:27017"
     environment:
-      - MONGO_INITDB_ROOT_USERNAME=bahar
-      - MONGO_INITDB_ROOT_PASSWORD=123456
+      MONGO_INITDB_ROOT_USERNAME: bahar
+      MONGO_INITDB_ROOT_PASSWORD: 123456
     volumes:
       - mongo-data:/data/db
     networks:
-      - my_network
+      - my_network  
+
 volumes:
   db_data:
   mongo-data:
+
 networks:
   my_network:
     driver: bridge
