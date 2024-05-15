@@ -186,9 +186,11 @@ const { MongoClient } = require('mongodb');
 
 const username = encodeURIComponent("bahar");
 const password = encodeURIComponent("123456");
+const dbName = 'techstack';
 const url = `mongodb://${username}:${password}@mongodb:27017`;
 let client;
 let db;
+
 async function connect() {
     let client;
     
@@ -210,37 +212,17 @@ async function connect() {
 client = connect();
 
 
-// Yorum Şeması ve Modeli
-const ReviewSchema = new mongoose.Schema({
-    order_id: {
-      type: String,
-      required: true
-    },
-    user_id: {
-      type: String,
-      required: true
-    },
-    content: {
-      type: String,
-      required: true
-    },
-    rating: {
-      type: Number,
-      required: true
-    }
-  });
-  
-  const Comment = mongoose.model('Comment', ReviewSchema);
-  
-  // Middleware - JSON verilerini işleme
-  app.use(express.json());
-  
-  app.post('/review', async (req, res) => {
+// Yorum ekleme
+app.post('/review', async (req, res) => {
     const { order_id, user_id, content, rating } = req.body;
   
     try {
-      const comment = new Comment({ order_id, user_id, content, rating });
-      await comment.save();
+      const client = new MongoClient(url);
+      await client.connect();
+      const db = client.db(dbName);
+      const collection = db.collection('comments');
+      const result = await collection.insertOne({ order_id, user_id, content, rating });
+      console.log('Yorum başarıyla eklendi:', result.insertedId);
       res.status(201).send('Yorum başarıyla eklendi');
     } catch (err) {
       console.error('Yorum ekleme hatası:', err);
@@ -248,17 +230,20 @@ const ReviewSchema = new mongoose.Schema({
     }
   });
   
-  // Tüm yorumları getiren endpoint
+  // Tüm yorumları getirme
   app.get('/comments', async (req, res) => {
     try {
-      const comments = await Comment.find();
+      const client = new MongoClient(url);
+      await client.connect();
+      const db = client.db(dbName);
+      const collection = db.collection('comments');
+      const comments = await collection.find({}).toArray();
       res.json(comments);
     } catch (err) {
       console.error('Yorumlar getirme hatası:', err);
       res.status(500).send('Yorumlar getirilirken bir hata oluştu');
     }
   });
-
   app.get("/logout",(req,res)=>{
       req.session.destroy((err)=>{
           if(err)
